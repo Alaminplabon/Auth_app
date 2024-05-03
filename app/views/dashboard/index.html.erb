@@ -1,0 +1,177 @@
+<style>
+    /* Table styles */
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        border-spacing: 0;
+        font-family: Arial, sans-serif;
+        color: #333;
+    }
+
+    th, td {
+        padding: 10px;
+        border-bottom: 1px solid #ddd;
+    }
+
+    th {
+        background-color: #4CAF50;
+        color: white;
+        text-align: left;
+    }
+
+    tr:nth-child(even) {
+        background-color: #f2f2f2;
+    }
+
+    /* Checkbox styles */
+    .user-checkbox {
+        margin-right: 5px;
+    }
+
+    /* Button styles */
+    button {
+        background-color: #008CBA;
+        color: white;
+        padding: 10px 20px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        margin-right: 10px; /* Added spacing between buttons */
+        margin-bottom: 10px; /* Added spacing between buttons */
+    }
+
+    button.delete-button {
+        background-color: #cc0000; /* Changed delete button color */
+    }
+
+    button:hover {
+        background-color: #005f70;
+    }
+</style>
+<h1>All Users</h1>
+
+<%= form_tag delete_users_path, method: :delete, id: 'delete-users-form' do %>
+  <button type="submit" onclick="return confirm('Are you sure you want to delete selected users?')">Delete Selected Users</button>
+  <button type="button" class="action-button" id="block-users-button">Block Selected Users</button>
+  <button type="button" class="action-button" id="unblock-users-button">Unblock Selected Users</button>
+  <table>
+    <thead>
+    <tr>
+      <th></th>
+      <th>Name</th>
+      <th>Email</th>
+      <th>Last Login</th>
+      <th>Status</th>
+    </tr>
+    </thead>
+    <tbody>
+    <% @users.each do |user| %>
+      <tr>
+        <td><%= check_box_tag "user_ids[]", user.id, false, class: 'user-checkbox', id: "user_#{user.id}" %></td>
+        <td><%= user.name %></td>
+        <td><%= user.email %></td>
+        <td><%= user.last_login_at %></td>
+        <td><%= user.blocked ? 'Blocked' : 'Active' %></td>
+      </tr>
+    <% end %>
+    </tbody>
+  </table>
+<% end %>
+
+<%= link_to "Logout", logout_path, method: :delete, style: "background-color: #008CBA; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; text-decoration: none; display: inline-block;" %>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const deleteForm = document.getElementById('delete-users-form');
+        const blockButton = document.getElementById('block-users-button');
+        const unblockButton = document.getElementById('unblock-users-button');
+
+        blockButton.addEventListener("click", function() {
+            updateStatusOfSelectedUsers(true);
+        });
+
+        unblockButton.addEventListener("click", function() {
+            updateStatusOfSelectedUsers(false);
+        });
+
+        async function updateStatusOfSelectedUsers(blocked) {
+            const confirmAction = blocked ? 'block' : 'unblock';
+            const confirmMessage = `Are you sure you want to ${confirmAction} selected users?`;
+            const confirmActionText = blocked ? 'Blocked' : 'Unblocked';
+
+            const selectedUserCheckboxes = document.querySelectorAll('.user-checkbox:checked');
+            if (selectedUserCheckboxes.length === 0) {
+                alert("Please select users to perform this action.");
+                return;
+            }
+
+            const confirmDelete = confirm(confirmMessage);
+            if (!confirmDelete) {
+                return;
+            }
+
+            const formData = new FormData();
+            selectedUserCheckboxes.forEach(function(checkbox) {
+                formData.append("user_ids[]", checkbox.value);
+            });
+            formData.append("blocked", blocked);
+
+            try {
+                const response = await fetch('/update_user_status', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Failed to ${confirmAction} selected users`);
+                }
+
+                // Update status in the table
+                selectedUserCheckboxes.forEach(function(checkbox) {
+                    const userRow = checkbox.closest('tr');
+                    const statusCell = userRow.querySelector('td:last-child');
+                    statusCell.textContent = confirmActionText;
+                });
+
+                alert(`Selected users ${confirmActionText.toLowerCase()} successfully!`);
+            } catch (error) {
+                console.error(error.message);
+                alert(`Failed to ${confirmAction} selected users`);
+            }
+        }
+
+        deleteForm.addEventListener("submit", async function(event) {
+            const confirmDelete = confirm('Are you sure you want to delete selected users?');
+            if (!confirmDelete) {
+                event.preventDefault();
+                return;
+            }
+
+            event.preventDefault();
+            const formData = new FormData(deleteForm);
+
+            try {
+                const response = await fetch(deleteForm.getAttribute('action'), {
+                    method: deleteForm.getAttribute('method'),
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to delete selected users');
+                }
+
+                // Remove selected users from the table
+                const selectedUserCheckboxes = document.querySelectorAll('.user-checkbox:checked');
+                selectedUserCheckboxes.forEach(function(checkbox) {
+                    const userRow = checkbox.closest('tr');
+                    userRow.remove();
+                });
+
+                alert('Selected users deleted successfully!');
+            } catch (error) {
+                console.error(error.message);
+                alert('Failed to delete selected users');
+            }
+        });
+    });
+</script>
